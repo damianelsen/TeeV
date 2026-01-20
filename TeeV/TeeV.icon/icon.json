@@ -1,0 +1,60 @@
+{
+  "color-space-for-untagged-svg-colors" : "display-p3",
+  "fill" : "automatic",
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "blend-mode" : "normal",
+          "fill-specializations" : [
+            {
+              "value" : "none"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : {
+                "solid" : "srgb:0.83742,0.83744,0.83743,1.00000"
+              }
+            }
+          ],
+          "hidden" : false,
+          "image-name" : "photo.tv.svg",
+          "name" : "photo.tv",
+          "position" : {
+            "scale" : 30,
+            "translation-in-points" : [
+              10,
+              25
+            ]
+          }
+        },
+        {
+          "glass" : true,
+          "hidden" : true,
+          "image-name" : "tv.svg",
+          "name" : "tv",
+          "position" : {
+            "scale" : 30,
+            "translation-in-points" : [
+              10,
+              25
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "iOS"
+    ]
+  }
+}
