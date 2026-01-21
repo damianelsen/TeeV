@@ -16,7 +16,7 @@ class TeeVConstants {
     // MARK: - API Token
     
     // TODO: remove this before adding to source code control
-    static private let apiBearerToken = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJkMmNlMGUwN2M0OTlkNmY0MTYwOTc3NjEyZGI2NjVhOSIsIm5iZiI6MTc2Mjk3NjQxMS4yNzYsInN1YiI6IjY5MTRlMjliMjg1OWRkOTc1NTRjOTIzYyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.pa5iIPqRpa1lXknzUuk-5pBYJQGurB4IC8cA-6xWJNI"
+    static private let apiBearerToken = ""
 
     // MARK: - API Headers
     
