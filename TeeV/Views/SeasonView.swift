@@ -31,59 +31,68 @@ struct SeasonView: View {
     let season: Season
     
     var body: some View {
-        VStack {
-            Text("\(season.show.name)\n\(season.name)")
-                .font(.largeTitle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-            HStack {
-                Image(uiImage: (UIImage(data: season.poster) ?? UIImage(systemName: "photo.tv"))!)
-                    .frame(maxHeight: .infinity, alignment: .top)
+        Text("\(season.show.name)")
+            .font(.largeTitle)
+            .lineLimit(...1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+        Text("\(season.name)")
+            .font(.title)
+            .lineLimit(...1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+        HStack {
+            Image(uiImage: (UIImage(data: season.poster) ?? UIImage(systemName: "photo.tv"))!)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 190, height: 285, alignment: .center)
+            ScrollView {
                 Text(season.overview == String() ? "No season overview has been provided." : season.overview)
-                    .lineLimit(...15)
                     .frame(maxHeight: .infinity, alignment: .top)
             }
+            .frame(width: 190, height: 285, alignment: .top)
+        }
+        .padding(.horizontal, 8)
+        Text("Episodes")
+            .font(.title2)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
-            Text("Episodes")
-                .font(.title2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-            List{
-                ForEach(season.episodes.sorted(by: { $1.episodeNumber < $0.episodeNumber })) {episode in
-                    DisclosureGroup {
-                        VStack {
-                            Text(episode.overview.isEmpty ? "No episode overview has been provided." : episode.overview)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(getWhenAirsFor(episode: episode))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    } label: {
-                        Text("\(episode.episodeNumber). \(episode.name)")
-                            .font(.title3)
+        List{
+            ForEach(season.episodes.sorted(by: { $1.episodeNumber < $0.episodeNumber })) {episode in
+                DisclosureGroup {
+                    VStack {
+                        Text(episode.overview.isEmpty ? "No episode overview has been provided." : episode.overview)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Image(systemName: "checkmark.circle.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 24, height: 24)
-                            .foregroundStyle(episode.watched ? .green : .white)
-                            .frame(alignment: .trailing)
-                            .onTapGesture() {
-                                showingConfirmation = !episode.watched
-                            }
-                            .confirmationDialog("Mark Episode Watched", isPresented: $showingConfirmation) {
-                                Button("Yes") {
-                                    markWatchedFor(episode: episode)
-                                }
-                            } message: {
-                                Text("Are you sure you want to mark this episode as watched? Doing so will also mark all previous episodes in all previous seasons as watched.")
-                            }
+                        Text(getWhenAirs(for: episode))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                } label: {
+                    Text("\(episode.episodeNumber). \(episode.name)")
+                        .font(.title3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "checkmark.circle.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(episode.watched ? .green : .white)
+                        .frame(alignment: .trailing)
+                        .onTapGesture() {
+                            showingConfirmation = !episode.watched
+                        }
+                        .confirmationDialog("Mark Episode Watched", isPresented: $showingConfirmation) {
+                            Button("Yes") {
+                                markWatched(for: episode)
+                            }
+                        } message: {
+                            Text("Are you sure you want to mark this episode as watched? Doing so will also mark all previous episodes in all previous seasons as watched.")
+                        }
                 }
             }
         }
+        .listStyle(.plain)
     }
     
-    private func getWhenAirsFor(episode: Episode) -> String {
+    private func getWhenAirs(for episode: Episode) -> String {
         guard ( episode.airDate != Date.distantPast ) else {
             return "No air date has been provided."
         }
@@ -95,17 +104,40 @@ struct SeasonView: View {
         return "\(airingLiteral) on \(formattedAirDate)"
     }
     
-    private func markWatchedFor(episode: Episode) {
-        Task {
-            let showController = DataController(modelContext: modelContext)
+    private func markWatched(for episode: Episode) {
+        let showController = DataController(modelContext: modelContext)
 
-            await showController.markAllWatchedFor(episode: episode)
-        }
+        showController.markAllWatched(for: episode)
     }
 }
 
-// TODO: fix this
-//#Preview {
-//    SeasonView()
-//}
+#Preview {
+    let show = Show(
+        id: 1,
+        name: "Show Name",
+        overview: "Sample overview text describing the show in more than a single line. Sample overview text describing the show in more than a single line. Sample overview text describing the show in more than a single line. Sample overview text describing the show in more than a single line. Sample overview text describing the show in more than a single line.",
+        poster: Data(),
+        backdrop: Data(),
+        status: "Returning Series",
+        seasonCount: 1
+    )
+    let season = Season(
+        show: show,
+        seasonNumber: 1,
+        name: "Season One",
+        overview: "Sample overview text describing the season in more than a single line. Sample overview text describing the season in more than a single line. Sample overview text describing the season in more than a single line. Sample overview text describing the season in more than a single line. Sample overview text describing the season in more than a single line.",
+        poster: Data(),
+        airDate: Date()
+    )
+    let episode = Episode(
+        season: season,
+        episodeNumber: 1,
+        name: "Episode One",
+        overview: "Sample overview text describing the episode in more than a single line. Sample overview text describing the episode in more than a single line.",
+        airDate: Date(),
+        hostId: 0)
+    season.episodes.append(episode)
+    
+    return SeasonView(season: season)
+}
 

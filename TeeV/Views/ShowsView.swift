@@ -12,9 +12,9 @@ struct ShowsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
     @StateObject private var newShow = NewShow()
-    @State private var badgeManager = AppAlertBadgeManager(application: UIApplication.shared)
     @State private var showingSearchView: Bool = false
     @Query(sort: [
+        SortDescriptor(\Show.started, order: .reverse),
         SortDescriptor(\Show.daysToNextEpisode),
         SortDescriptor(\Show.lastWatched, order: .reverse),
         SortDescriptor(\Show.status, order: .reverse)
@@ -32,9 +32,7 @@ struct ShowsView: View {
                     }
                 }
                 .onDelete{ indexes in
-                    Task {
-                        await deleteShowAt(index: indexes.first!)
-                    }
+                    deleteShow(at: indexes.first!)
                 }
                 .listRowInsets(.init())
                 .listRowSeparator(.hidden)
@@ -55,13 +53,14 @@ struct ShowsView: View {
             }
         }
         .onChange(of: newShow.id) {
-            addShow(id: newShow.id)
+            addShow(with: newShow.id)
         }
         .onAppear {
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { (_, _) in }
+            requestNotificationAuthorization()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
+                UNUserNotificationCenter.current().setBadgeCount(999)  // TODO: remove this
                 Task {
                     await updateBadgeCount()
                     await updateNotificationBadgeCounts()
@@ -70,30 +69,37 @@ struct ShowsView: View {
         }
     }
     
-    private func addShow(id: Int) {
+    private func addShow(with id: Int) {
         Task {
             let showController = DataController(modelContext: modelContext)
 
-            try await showController.addNewShowWith(id: id)
+            try await showController.addNewShow(with: id)
         }
     }
+    
+    private func requestNotificationAuthorization() {
+        let notificationController = NotificationController(modelContext: modelContext)
+        
+        notificationController.requestNotificationAuthorization()
+    }
 
-    private func deleteShowAt(index: Int) async {
+    private func deleteShow(at index: Int) {
         let showController = DataController(modelContext: modelContext)
         let show = shows[index]
 
-        await showController.removeShowWith(id: show.id)
+        showController.removeShow(with: show.id)
     }
     
     private func updateBadgeCount() async {
         let showController = DataController(modelContext: modelContext)
         let count = showController.getTotalUnwatchedEpisodes()
         
-        await badgeManager.setAlertBadge(number: count)
+        let notificationController = NotificationController(modelContext: modelContext)
+        await notificationController.setAppBadgeCount(to: count)
     }
     
     private func updateNotificationBadgeCounts() async {
-        let notificationController = await NotificationController(modelContext: modelContext)
+        let notificationController = NotificationController(modelContext: modelContext)
         
         await notificationController.updateNotificationBadgeCounts()
     }

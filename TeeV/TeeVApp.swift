@@ -36,8 +36,8 @@ struct TeeVApp: App {
                         let config = try await getConfiguration()
                         UserDefaults.standard.register(defaults: [
                             TeeVConstants.appStorageUrlBase: config.images.secure_base_url,
-                            TeeVConstants.appStorageBackdropSize: config.images.backdrop_sizes[2],
-                            TeeVConstants.appStoragePosterSize: config.images.poster_sizes[0]
+                            TeeVConstants.appStorageBackdropSize: config.images.backdrop_sizes[1],
+                            TeeVConstants.appStoragePosterSize: config.images.poster_sizes[2]
                         ])
                     } catch {
                         print("Failed to fetch configuration: \(error)")

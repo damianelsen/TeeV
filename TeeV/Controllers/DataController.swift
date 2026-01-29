@@ -16,26 +16,26 @@ class DataController {
         self.modelContext = modelContext
     }
 
-    func addNewShowWith(id: Int) async throws {
+    func addNewShow(with id: Int) async throws {
         let shows = try? modelContext.fetch(FetchDescriptor<Show>(predicate: #Predicate {
             show in show.id == id
         }))
         guard (shows?.count == 0) else { return }
         
-        let showResponse = try await getShow(id: id)
-        let showPoster = try await getPosterFrom(path: showResponse.poster_path)
-        let showBackdrop = try await getPosterFrom(path: showResponse.backdrop_path, asBackdrop: true)
+        let showResponse = try await getShow(with: id)
+        let showPoster = try await getPoster(from: showResponse.poster_path)
+        let showBackdrop = try await getPoster(from: showResponse.backdrop_path, asBackdrop: true)
         let newShow = self.createNewShow(from: showResponse, withPoster: showPoster, andBackdrop: showBackdrop)
-        let notifications = await NotificationController(modelContext: modelContext)
+        let notifications = NotificationController(modelContext: modelContext)
         
         for season in showResponse.seasons.filter({$0.season_number > 0}) {
-            let seasonResponse = try await getSeason(showId: id, seasonNumber: season.season_number)
-            let seasonPoster = try await getPosterFrom(path: seasonResponse.poster_path)
+            let seasonResponse = try await getSeason(forShow: id, with: season.season_number)
+            let seasonPoster = try await getPoster(from: seasonResponse.poster_path)
             let newSeason = self.createNewSeason(for: newShow, from: seasonResponse, withPoster: seasonPoster)
             
             for episode in seasonResponse.episodes {
                 let newEpisode = self.createNewEpisode(for: newSeason, from: episode)
-                await notifications.createNotificationFor(episode: newEpisode)
+                await notifications.createNotification(for: newEpisode)
                 
                 newSeason.episodes.append(newEpisode)
             }
@@ -47,56 +47,58 @@ class DataController {
             .first(where: { $0.seasonNumber == 1 })!.episodes
             .first(where: { $0.episodeNumber == 1 })
         newShow.nextEpisode = firstEpisode
-        newShow.daysToNextEpisode = self.daysUntilBroadcastFor(episode: firstEpisode!)
+        newShow.daysToNextEpisode = self.daysUntilBroadcast(for: firstEpisode!)
+        
+        // Special case for Daily Show episode with no air date
+        if (id == 2224) {
+            let offendingEpisode = newShow.seasons.first(where: { $0.seasonNumber == 6 })?.episodes.first(where: { $0.episodeNumber == 111 })
+
+            offendingEpisode?.airDate = convertDate(from: "2001-09-17")
+        }
     }
 
     func refreshShows() async throws -> String {
         let shows = try modelContext.fetch(FetchDescriptor<Show>())
-        let notifications = await NotificationController(modelContext: modelContext)
+        let notifications = NotificationController(modelContext: modelContext)
         var updatedMessage = ""
 
 //        try await withThrowingTaskGroup(of: Void.self) { group in
         for show in shows {
 //                group.addTask {
-                    // Update the show
-            let showResponse = try await getShow(id: show.id)
+            // Update the show
+            let showResponse = try await getShow(with: show.id)
             show.name = showResponse.name
             show.overview = showResponse.overview
-            show.poster = try await self.getPosterFrom(path: showResponse.poster_path)
+            show.poster = try await self.getPoster(from: showResponse.poster_path)
             show.status = showResponse.status
             
             // Update the most recent season
             let mostRecentSeason = show.seasons.max(by: { $0.seasonNumber < $1.seasonNumber })!
-            let seasonResponse = try await getSeason(showId: show.id, seasonNumber: mostRecentSeason.seasonNumber)
+            let seasonResponse = try await getSeason(forShow: show.id, with: mostRecentSeason.seasonNumber)
             mostRecentSeason.name = seasonResponse.name
             mostRecentSeason.overview = seasonResponse.overview
-            mostRecentSeason.poster = try await self.getPosterFrom(path: seasonResponse.poster_path)
-            mostRecentSeason.airDate = seasonResponse.air_date != nil ? convertDateFrom(dateString: seasonResponse.air_date!) : Date.distantPast
+            mostRecentSeason.poster = try await self.getPoster(from: seasonResponse.poster_path)
+            mostRecentSeason.airDate = seasonResponse.air_date != nil ? convertDate(from: seasonResponse.air_date!) : Date.distantPast
 
             let mostRecentEpisode = mostRecentSeason.episodes.max(by: { $0.episodeNumber < $1.episodeNumber })
             let mostRecentEpisodeNumber = mostRecentEpisode == nil ? 0 : mostRecentEpisode!.episodeNumber
-            let existingEpisodes = seasonResponse.episodes.filter({ $0.episode_number <= mostRecentEpisodeNumber })
-            let newEpisodes = seasonResponse.episodes.filter({ $0.episode_number > mostRecentEpisodeNumber })
+            let existingEpisodeResponses = seasonResponse.episodes.filter({ $0.episode_number <= mostRecentEpisodeNumber })
+            let newEpisodeResponses = seasonResponse.episodes.filter({ $0.episode_number > mostRecentEpisodeNumber })
 
             // Update the existing episodes
-            for episode in existingEpisodes {
-                let existingEpisode = mostRecentSeason.episodes.first(where: { $0.episodeNumber == episode.episode_number })!
-                let existingEpisodeAirDate = existingEpisode.airDate
+            for existingEpisodeResponse in existingEpisodeResponses {
+                let existingEpisode = mostRecentSeason.episodes.first(where: { $0.episodeNumber == existingEpisodeResponse.episode_number })!
 
-                existingEpisode.name = episode.name
-                existingEpisode.overview = episode.overview ?? String()
-                existingEpisode.airDate = episode.air_date != nil ? convertDateFrom(dateString: episode.air_date!) : Date.distantPast
-                if existingEpisodeAirDate != existingEpisode.airDate {
-                    print("existingEpisodeAirDate:\(existingEpisodeAirDate) != existingEpisode.airDate\(existingEpisode.airDate)")
-                    notifications.deleteNotificationFor(episode: existingEpisode)
-                    await notifications.createNotificationFor(episode: existingEpisode)
+                if self.episodeHasChanged(from: existingEpisode, to: existingEpisodeResponse) {
+                    notifications.deleteNotification(for: existingEpisode)
+                    await notifications.createNotification(for: existingEpisode)
                 }
             }
 
             // Add any new episodes
-            for episode in newEpisodes {
-                let newEpisode = self.createNewEpisode(for: mostRecentSeason, from: episode)
-                await notifications.createNotificationFor(episode: newEpisode)
+            for newEpisodeResponse in newEpisodeResponses {
+                let newEpisode = self.createNewEpisode(for: mostRecentSeason, from: newEpisodeResponse)
+                await notifications.createNotification(for: newEpisode)
 
                 mostRecentSeason.episodes.append(newEpisode)
                 mostRecentSeason.watched = false
@@ -108,14 +110,14 @@ class DataController {
                 show.seasonCount = showResponse.number_of_seasons
                 
                 for seasonNumber in show.seasons.count + 1...show.seasonCount {
-                    let seasonResponse = try await getSeason(showId: show.id, seasonNumber: seasonNumber)
-                    let seasonPoster = try await self.getPosterFrom(path: seasonResponse.poster_path)
+                    let seasonResponse = try await getSeason(forShow: show.id, with: seasonNumber)
+                    let seasonPoster = try await self.getPoster(from: seasonResponse.poster_path)
                     let newSeason = self.createNewSeason(for: show, from: seasonResponse, withPoster: seasonPoster)
                     
                     for episode in seasonResponse.episodes {
                         let newEpisode = self.createNewEpisode(for: newSeason, from: episode)
                         
-                        await notifications.createNotificationFor(episode: newEpisode)
+                        await notifications.createNotification(for: newEpisode)
                         newSeason.episodes.append(newEpisode)
                     }
 
@@ -124,17 +126,17 @@ class DataController {
             }
             
             if show.nextEpisode == nil {
-                show.nextEpisode = self.getNextUnwatchedEpisodeFor(show: show)
+                show.nextEpisode = self.getNextUnwatchedEpisode(for: show)
                 show.nextEpisodeNumber += show.nextEpisode != nil ? 1 : 0
             }
-            show.daysToNextEpisode = show.nextEpisode != nil ? self.daysUntilBroadcastFor(episode: show.nextEpisode!) : 9999
+            show.daysToNextEpisode = show.nextEpisode != nil ? self.daysUntilBroadcast(for: show.nextEpisode!) : TeeVConstants.distantFutureDays
 
-            if newEpisodes.count > 0 || newSeasonCount > 0 {
+            if newEpisodeResponses.count > 0 || newSeasonCount > 0 {
                 updatedMessage += updatedMessage.isEmpty ? "" : "\n"
                 updatedMessage += "\(show.name) updated with "
-                updatedMessage += newEpisodes.count > 0 ? "\(newEpisodes.count) new episode" : ""
-                updatedMessage += newEpisodes.count > 1 ? "s" : ""
-                updatedMessage += newEpisodes.count > 0 && newSeasonCount > 0 ? " and " : ""
+                updatedMessage += newEpisodeResponses.count > 0 ? "\(newEpisodeResponses.count) new episode" : ""
+                updatedMessage += newEpisodeResponses.count > 1 ? "s" : ""
+                updatedMessage += newEpisodeResponses.count > 0 && newSeasonCount > 0 ? " and " : ""
                 updatedMessage += newSeasonCount > 0 ? "\(newSeasonCount) new season" : ""
                 updatedMessage += newSeasonCount > 1 ? "s" : ""
                 updatedMessage += "."
@@ -147,7 +149,7 @@ class DataController {
         return updatedMessage
     }
     
-    func removeShowWith(id: Int) async {
+    func removeShow(with id: Int) {
         let shows = try? modelContext.fetch(FetchDescriptor<Show>(predicate: #Predicate { show in
             show.id == id
         }))
@@ -159,45 +161,46 @@ class DataController {
         }))
 
         if let episodes {
-            let notificationController = await NotificationController(modelContext: modelContext)
+            let notificationController = NotificationController(modelContext: modelContext)
 
             for episode in episodes where episode.notificationId != nil {
-                notificationController.deleteNotificationFor(episode: episode)
+                notificationController.deleteNotification(for: episode)
             }
         }
         
         modelContext.delete(show)
     }
     
-    func markNextEpisodeAsWatchedFor(show: Show) async {
-        let notificationController = await NotificationController(modelContext: modelContext)
+    func markNextEpisodeAsWatched(for show: Show) {
+        let notificationController = NotificationController(modelContext: modelContext)
         
         show.nextEpisode!.watched = true
         show.nextEpisode!.season.watched = show.nextEpisode!.season.episodes.allSatisfy({ $0.watched })
-        notificationController.deleteNotificationFor(episode: show.nextEpisode!)
-        show.nextEpisode = self.getNextUnwatchedEpisodeFor(show: show)
+        notificationController.deleteNotification(for: show.nextEpisode!)
+        show.nextEpisode = self.getNextUnwatchedEpisode(for: show)
         show.nextEpisodeNumber += show.nextEpisode != nil ? 1 : 0
-        show.daysToNextEpisode = show.nextEpisode != nil ? self.daysUntilBroadcastFor(episode: show.nextEpisode!) : 9999
+        show.daysToNextEpisode = show.nextEpisode != nil ? self.daysUntilBroadcast(for: show.nextEpisode!) : TeeVConstants.distantFutureDays
         show.lastWatched = Date.now
+        show.started = true
     }
     
-    func markAllWatchedFor(season: Season) async {
+    func markAllWatched(for season: Season) {
         let lastEpisode = season.episodes.max(by: { $0.episodeNumber < $1.episodeNumber })!
         
-        await self.markAllWatchedFor(episode: lastEpisode)
+        self.markAllWatched(for: lastEpisode)
     }
     
-    func markAllWatchedFor(episode: Episode) async {
+    func markAllWatched(for episode: Episode) {
         repeat {
-            if self.daysUntilBroadcastFor(episode: episode.season.show.nextEpisode!) == 0 {
-                await self.markNextEpisodeAsWatchedFor(show: episode.season.show)
+            if self.daysUntilBroadcast(for: episode.season.show.nextEpisode!) == 0 {
+                self.markNextEpisodeAsWatched(for: episode.season.show)
             } else {
                 break
             }
         } while episode.season.show.nextEpisode != episode
         
-        if self.daysUntilBroadcastFor(episode: episode.season.show.nextEpisode!) == 0 {
-            await self.markNextEpisodeAsWatchedFor(show: episode.season.show)
+        if self.daysUntilBroadcast(for: episode.season.show.nextEpisode!) == 0 {
+            self.markNextEpisodeAsWatched(for: episode.season.show)
         }
     }
     
@@ -208,20 +211,20 @@ class DataController {
         
         if let unwatchedEpisodes {
             return unwatchedEpisodes
-                .filter({ self.daysUntilBroadcastFor(episode: $0) == 0 })
+                .filter({ self.daysUntilBroadcast(for: $0) == 0 })
                 .count
         } else {
             return 0
         }
     }
 
-    private func getNextUnwatchedEpisodeFor(show: Show) -> Episode? {
+    private func getNextUnwatchedEpisode(for show: Show) -> Episode? {
         let firstSeason = show.seasons.first(where: { $0.seasonNumber == 1 })
 
-        return self.getNextUnwatchedEpisodeFor(season: firstSeason)
+        return self.getNextUnwatchedEpisode(for: firstSeason)
     }
 
-    private func getNextUnwatchedEpisodeFor(season: Season?) -> Episode? {
+    private func getNextUnwatchedEpisode(for season: Season?) -> Episode? {
         guard ( season != nil ) else { return nil }
         
         let oldestUnwatchedEpisode = season!.episodes
@@ -230,7 +233,7 @@ class DataController {
 
         if oldestUnwatchedEpisode == nil {
             let nextSeason = season!.show.seasons.first(where: { $0.seasonNumber == season!.seasonNumber + 1 })
-            return self.getNextUnwatchedEpisodeFor(season: nextSeason)
+            return self.getNextUnwatchedEpisode(for: nextSeason)
         } else {
             return oldestUnwatchedEpisode!
         }
@@ -259,7 +262,7 @@ class DataController {
             name: season.name,
             overview: season.overview,
             poster: poster,
-            airDate: season.air_date != nil ? convertDateFrom(dateString: season.air_date!) : Date.distantPast
+            airDate: season.air_date != nil ? convertDate(from: season.air_date!) : Date.distantPast
         )
         
         self.modelContext.insert(newSeason)
@@ -267,55 +270,45 @@ class DataController {
         return newSeason
     }
     
-    private func createNewEpisode(for season: Season, from episode: SeasonEpisodeResponse) -> Episode {
+    private func createNewEpisode(for season: Season, from episode: SeasonEpisodeResponse, withInsert insert: Bool = true) -> Episode {
+        let hostId = episode.guest_stars?.first(where: { $0.id == 12219 })?.id ?? 0
         let newEpisode = Episode(
             season: season,
             episodeNumber: episode.episode_number,
             name: episode.name,
             overview: episode.overview ?? String(),
-            airDate: episode.air_date != nil ? convertDateFrom(dateString: episode.air_date!) : Date.distantPast
+            airDate: episode.air_date != nil ? convertDate(from: episode.air_date!) : Date.distantPast,
+            hostId: hostId
         )
         
-        self.modelContext.insert(newEpisode)
+        if insert {
+            self.modelContext.insert(newEpisode)
+        }
         
         return newEpisode
     }
     
-    private func daysUntilBroadcastFor(episode: Episode) -> Int {
+    private func episodeHasChanged(from oldEpisode: Episode, to newEpisodeResponse: SeasonEpisodeResponse) -> Bool {
+        let newEpisode = self.createNewEpisode(for: oldEpisode.season, from: newEpisodeResponse, withInsert: false)
+        let episodeHasChanged = oldEpisode != newEpisode
+        
+        if episodeHasChanged {
+            oldEpisode.name = newEpisode.name
+            oldEpisode.overview = newEpisode.overview
+            oldEpisode.airDate = newEpisode.airDate
+        }
+        
+        return episodeHasChanged
+    }
+    
+    private func daysUntilBroadcast(for episode: Episode) -> Int {
+        guard ( episode.airDate != Date.distantPast ) else { return TeeVConstants.distantFutureDays }
+        
         return max(getDaysBetween(from: getNowAtUtcMidnight(), to: episode.airDate), 0)
     }
     
-    private func getPosterFrom(path: String?, asBackdrop backdrop: Bool = false) async throws -> Data {
-        return path == nil ? Data.init() : try await getImage(imagePath: path!, backdrop: backdrop)
-    }
-    
-    // TODO: to be deleted
-    
-    func deleteMostRecentSeasson(of show: Show) {
-        let mostRecentSeason = show.seasons.max(by: { $0.seasonNumber < $1.seasonNumber })!
-        let mostRecentSeasonIndex = show.seasons.firstIndex(of: mostRecentSeason)!
-
-        for _ in 0..<mostRecentSeason.episodes.count {
-            let episode = mostRecentSeason.episodes.popLast()!
-            self.modelContext.delete(episode)
-        }
-
-        show.seasons.remove(at: mostRecentSeasonIndex)
-
-        self.modelContext.delete(mostRecentSeason)
-        
-        show.seasonCount -= 1
-        show.nextEpisode = getNextUnwatchedEpisodeFor(show: show)
-    }
-    
-    func deleteEpisodesWith(count: Int, from show: Show) {
-        let mostRecentSeason = show.seasons.max(by: { $0.seasonNumber < $1.seasonNumber })!
-
-        for _ in 0..<count {
-            let episode = mostRecentSeason.episodes.max(by: { $0.episodeNumber < $1.episodeNumber })!
-            mostRecentSeason.episodes.removeAll(where: { $0.episodeNumber == episode.episodeNumber })
-            self.modelContext.delete(episode)
-        }
+    private func getPoster(from path: String?, asBackdrop: Bool = false) async throws -> Data {
+        return path == nil ? Data.init() : try await getImage(from: path!, asBackdrop: asBackdrop)
     }
 }
 

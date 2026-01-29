@@ -20,6 +20,7 @@ final class Show {
     var nextEpisodeNumber: Int
     var daysToNextEpisode: Int
     var lastWatched: Date
+    var started: Bool
     var nextEpisode: Episode?
     @Relationship(deleteRule: .cascade, inverse: \Season.show) var seasons: [Season]
 
@@ -42,6 +43,7 @@ final class Show {
         self.nextEpisodeNumber = 1
         self.daysToNextEpisode = 0
         self.lastWatched = Date.now
+        self.started = false
         self.seasons = []
     }
 }

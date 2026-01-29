@@ -7,18 +7,20 @@
 
 import Foundation
 
-func convertDateFrom(dateString: String) -> Date {
+func convertDate(from dateString: String) -> Date {
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = TeeVConstants.apiDateFormat
-    dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-    let convertedDate = dateFormatter.date(from: dateString)!
+    dateFormatter.timeZone = TimeZone(abbreviation: "UTC")
     
-    return convertedDate
+    return dateFormatter.date(from: dateString)!
 }
 
 func getNowAtUtcMidnight() -> Date {
     let calendar = Calendar.current
-    let now = "\(calendar.component(.year, from: Date.now))-\(calendar.component(.month, from: Date.now))-\(calendar.component(.day, from: Date.now))"
+    let year = calendar.component(.year, from: Date.now)
+    let month = calendar.component(.month, from: Date.now)
+    let day = calendar.component(.day, from: Date.now)
+    let now = "\(year)-\(month)-\(day)"
     
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = TeeVConstants.apiDateFormat

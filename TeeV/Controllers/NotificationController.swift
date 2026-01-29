@@ -11,32 +11,35 @@ import SwiftData
 
 class NotificationController {
     private var center: UNUserNotificationCenter!
-    private var settings: UNNotificationSettings!
     private let modelContext: ModelContext
 
-    init(modelContext: ModelContext) async {
+    init(modelContext: ModelContext) {
         self.center = UNUserNotificationCenter.current()
-        self.settings = await center.notificationSettings()
         self.modelContext = modelContext
     }
     
-    func createNotificationFor(episode: Episode) async {
+    func requestNotificationAuthorization() {
+        self.center.requestAuthorization(options: [.alert, .badge, .sound]) { (_, _) in }
+    }
+    
+    func createNotification(for episode: Episode) async {
+        let settings = await center.notificationSettings()
+
         guard ( settings.authorizationStatus == .authorized ) else { return }
-        guard ( self.episodeHasNotAiredFor(episode: episode) ) else { return }
+        guard ( self.episodeHasNotAired(for: episode) ) else { return }
+        guard ( self.dailyShowEpisodeNotHostedByJonStewart(episode: episode) ) else { return }
 
         let content = UNMutableNotificationContent()
         content.title = "New Episode of \(episode.season.show.name)"
         content.body = "S\(episode.season.seasonNumber) E\(episode.episodeNumber) \(episode.name) airs today."
         content.sound = .default
         
-        let triggerDate = createTriggerDateFrom(airDate: episode.airDate)
+        let triggerDate = createTriggerDate(from: episode.airDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: triggerDate, repeats: false)
         let identifier = UUID().uuidString
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
         
-        try? await center.add(request)
-        print("Added notification for \(episode.season.show.name) S\(episode.season.seasonNumber) E\(episode.episodeNumber) \(episode.name) with trigger date \(Calendar.current.date(from: triggerDate)!)")
-        
+        try? await center.add(request)        
         await self.updateNotificationBadgeCounts()
         
         episode.notificationId = identifier
@@ -50,7 +53,7 @@ class NotificationController {
         for notification in await center.pendingNotificationRequests() {
             let notificationTrigger = notification.trigger as! UNCalendarNotificationTrigger
             let episodesNotAired = unwatchedEpisodes!
-                .map({ self.createTriggerDateFrom(airDate: $0.airDate) })
+                .map({ self.createTriggerDate(from: $0.airDate) })
                 .map({ Calendar.current.date(from: $0)! })
                 .filter({ $0 <= notificationTrigger.nextTriggerDate()! })
                 .count
@@ -71,7 +74,15 @@ class NotificationController {
         }
     }
     
-    func deleteNotificationFor(episode: Episode) {
+    func setAppBadgeCount(to number: Int) async {
+        do {
+            try await self.center.setBadgeCount(number)
+        } catch {
+            print("Error setting the badge count to \(number): \(error)")
+        }
+    }
+    
+    func deleteNotification(for episode: Episode) {
         guard ( episode.notificationId != nil ) else { return }
         
         center.removePendingNotificationRequests(withIdentifiers: [episode.notificationId!])
@@ -79,17 +90,19 @@ class NotificationController {
         episode.notificationId = nil
     }
     
-    private func episodeHasNotAiredFor(episode: Episode) -> Bool {
+    private func episodeHasNotAired(for episode: Episode) -> Bool {
         return max(getDaysBetween(from: getNowAtUtcMidnight(), to: episode.airDate), 0) > 0
     }
     
-    private func createTriggerDateFrom(airDate: Date) -> DateComponents {
+    private func dailyShowEpisodeNotHostedByJonStewart(episode: Episode) -> Bool {
+        return !(episode.season.show.id == 2224 && episode.hostId == 0)
+    }
+    
+    private func createTriggerDate(from airDate: Date) -> DateComponents {
         var calendar = Calendar.current
         calendar.timeZone = TimeZone(abbreviation: "UTC")!
         let notificationDate = calendar.dateComponents(
-//            [.timeZone, .year, .month, .day, .hour, .minute],
             [.year, .month, .day],
-//            from: calendar.date(byAdding: .day, value: 1, to: airDate)!
             from: airDate
         )
         
@@ -98,7 +111,7 @@ class NotificationController {
         triggerDate.year = notificationDate.year
         triggerDate.month = notificationDate.month
         triggerDate.day = notificationDate.day
-        triggerDate.hour = 17
+        triggerDate.hour = 16
         triggerDate.minute = 0
         triggerDate.isLeapMonth = notificationDate.isLeapMonth
         

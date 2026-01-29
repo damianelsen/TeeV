@@ -1,11 +1,12 @@
 //
-//  ApiCalls.swift
+//  ApiFunctions.swift
 //  TeeV
 //
 //  Created by Damian Elsen on 11/13/25.
 //
 
 import Foundation
+import SwiftUI
 
 struct ConfigurationResponse: Decodable {
     let images: ImagesResponse
@@ -42,7 +43,7 @@ struct SearchShowResponse: Decodable, Identifiable {
     let poster_path: String?
 }
 
-func getShows(showName: String) async throws -> [SearchShowResponse] {
+func getShows(with showName: String) async throws -> [SearchShowResponse] {
     let url = URL(string: "\(TeeVConstants.tmdbSearchUrl)\(showName)")!
     var request = URLRequest(url: url)
     request.allHTTPHeaderFields = [
@@ -72,7 +73,7 @@ struct ShowSeasonResponse: Decodable {
     let season_number: Int
 }
 
-func getShow(id: Int) async throws -> ShowResponse {
+func getShow(with id: Int) async throws -> ShowResponse {
     let url = URL(string: "\(TeeVConstants.tmdbShowUrl)\(String(id))")!
     var request = URLRequest(url: url)
     request.allHTTPHeaderFields = [
@@ -99,30 +100,33 @@ struct SeasonEpisodeResponse: Decodable {
     let name: String
     let overview: String?
     let air_date: String?
+    let guest_stars: [SeasonEpisodeGuestStarsResponse]?
 }
 
-func getSeason(showId: Int, seasonNumber: Int) async throws -> SeasonResponse {
+struct SeasonEpisodeGuestStarsResponse: Decodable {
+    let id: Int?
+}
+
+func getSeason(forShow showId: Int, with seasonNumber: Int) async throws -> SeasonResponse {
     let url = URL(string: "\(TeeVConstants.tmdbShowUrl)\(String(showId))/season/\(String(seasonNumber))")!
     var request = URLRequest(url: url)
     request.allHTTPHeaderFields = [
         TeeVConstants.apiHeaderAuthorization: TeeVConstants.apiHeaderToken
     ]
 
-    var decoded: SeasonResponse!
-    do {
-        let (data, _) = try await URLSession.shared.data(for: request)
-        decoded = try JSONDecoder().decode(SeasonResponse.self, from: data)
-    } catch {
-        print ("Error decoding season: \(error)")
-    }
+    let (data, _) = try await URLSession.shared.data(for: request)
+    let decoded = try JSONDecoder().decode(SeasonResponse.self, from: data)
 
     return decoded
 }
 
-func getImage(imagePath: String, backdrop: Bool) async throws -> Data {
-    let config = try await getConfiguration()
-    let size = backdrop ? config.images.backdrop_sizes[2] : config.images.poster_sizes[2]
-    let url = URL(string: "\(config.images.secure_base_url)\(size)\(imagePath)")!
+func getImage(from imagePath: String, asBackdrop: Bool) async throws -> Data {
+    @AppStorage(TeeVConstants.appStorageUrlBase) var urlBase = ""
+    @AppStorage(TeeVConstants.appStorageBackdropSize) var backdropSize = ""
+    @AppStorage(TeeVConstants.appStoragePosterSize) var posterSize = ""
+
+    let size = asBackdrop ? backdropSize : posterSize
+    let url = URL(string: "\(urlBase)\(size)\(imagePath)")!
     var request = URLRequest(url: url)
     request.allHTTPHeaderFields = [
         TeeVConstants.apiHeaderAuthorization: TeeVConstants.apiHeaderToken

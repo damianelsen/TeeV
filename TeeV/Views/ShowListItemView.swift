@@ -13,20 +13,31 @@ struct ShowListItemView: View {
     let show: Show
     
     var body: some View {
-        let nextEpisodeAvailability = nextUnwatchedEpisodeAvailabilityFor(show: show)
-        
-        HStack {
+        let nextEpisodeAvailability = nextUnwatchedEpisodeAvailability(for: show)
+        let backgroundImage: some View = Group {
+            if let uiImage = UIImage(data: show.backdrop) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Color.gray.opacity(0.3)
+            }
+        }
+        .frame(width: 400, height: 110)
+        .clipped()
+
+        // TODO: are all of the trailing/leading values correct?
+        return HStack {
             VStack(alignment: .leading) {
                 Text(show.name)
                     .font(.title3)
                     .lineLimit(...1)
                     .padding(EdgeInsets(top: 56, leading: 15, bottom: 0, trailing: 0))
-                Text(nextEpisodeDetailsFor(show: show))
+                Text(nextEpisodeDetails(for: show))
                     .lineLimit(...1)
                     .padding(EdgeInsets(top: 0, leading: 15, bottom: 14, trailing: 0))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-//                    .background(.red)
             VStack(alignment: .trailing) {
                 Image(systemName: "clock")
                     .font(.subheadline)
@@ -38,46 +49,27 @@ struct ShowListItemView: View {
                     .padding(EdgeInsets(top: 0, leading: 0, bottom: 14, trailing: 15))
             }
             .frame(maxHeight: .infinity, alignment: .trailing)
-//                    .background(.yellow)
         }
-        .background(
-            Image(uiImage: (UIImage(data: show.backdrop) ?? UIImage(systemName: "photo.tv"))!)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 400, height: 110)
-                .clipped()
-        )
+        .background(backgroundImage)
         .swipeActions(edge: .leading) {
             if nextEpisodeAvailability == "Today" {
                 Button {
-                    Task {
-                        await markEpisodeAsWatched(for: show)
-                    }
+                    markEpisodeAsWatched(for: show)
                 } label: {
                     Label("Watched", systemImage: "eye")
                 }
                 .tint(.green)
             }
-//            Button {
-//                deleteMostRecentSeasson(of: show)
-//            } label: {
-//                Label("Remove Last Season", systemImage: "xmark.bin")
-//            }
-//            .tint(.red)
-//            Button {
-//                deleteMostRecentEpisodes(of: show)
-//            } label: {
-//                Label("Remove Last 3 Episodes", systemImage: "xmark.bin")
-//            }
-//            .tint(.red)
         }
     }
     
-    private func nextUnwatchedEpisodeAvailabilityFor(show: Show) -> String {
+    private func nextUnwatchedEpisodeAvailability(for show: Show) -> String {
         return if show.nextEpisode == nil && show.status == "Returning Series" {
             "TBA"
         } else if show.nextEpisode == nil {
             show.status
+        } else if show.nextEpisode!.airDate == Date.distantPast {
+            "TBA"
         } else {
             switch show.daysToNextEpisode {
                 case 0: "Today"
@@ -87,7 +79,7 @@ struct ShowListItemView: View {
         }
     }
     
-    private func nextEpisodeDetailsFor(show: Show) -> String {
+    private func nextEpisodeDetails(for show: Show) -> String {
         guard show.nextEpisode != nil else {
             return String()
         }
@@ -105,28 +97,24 @@ struct ShowListItemView: View {
         }
     }
     
-    private func markEpisodeAsWatched(for show: Show) async {
+    private func markEpisodeAsWatched(for show: Show) {
         let showController = DataController(modelContext: modelContext)
 
-        await showController.markNextEpisodeAsWatchedFor(show: show)
+        showController.markNextEpisodeAsWatched(for: show)
     }
-    
-    // TODO: to be deleted
-    
-//    private func deleteMostRecentSeasson(of show: Show) {
-//        let showController = ShowController(modelContext: modelContext)
-//        
-//        showController.deleteMostRecentSeasson(of: show)
-//    }
-//    
-//    private func deleteMostRecentEpisodes(of show: Show) {
-//        let showController = ShowController(modelContext: modelContext)
-//        
-//        showController.deleteEpisodesWith(count: 3, from: show)
-//    }
 }
 
-// TODO: fix this
-//#Preview {
-//    ShowListItemView(show: nil)
-//}
+#Preview {
+    let show = Show(
+        id: 1,
+        name: "Show Name",
+        overview: "Sample overview text describing the show in more than a single line. Sample overview text describing the show in more than a single line. Sample overview text describing the show in more than a single line. Sample overview text describing the show in more than a single line. Sample overview text describing the show in more than a single line.",
+        poster: Data(),
+        backdrop: Data(),
+        status: "Returning Series",
+        seasonCount: 1
+    )
+
+    return ShowListItemView(show: show)
+}
+

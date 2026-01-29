@@ -60,7 +60,7 @@ struct SearchView: View {
 
     private func showSearch() {
         Task {
-            shows = try await getShows(showName: showName)
+            shows = try await getShows(with: showName)
         }
     }
 }

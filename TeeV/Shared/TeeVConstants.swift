@@ -12,6 +12,7 @@ class TeeVConstants {
     // MARK: - Dates
     
     static let apiDateFormat = "yyyy-MM-dd"
+    static let distantFutureDays = 9999
 
     // MARK: - API Token
     
