@@ -26,29 +26,27 @@ struct ShowListItemView: View {
         .frame(width: 400, height: 110)
         .clipped()
 
-        // TODO: are all of the trailing/leading values correct?
         return HStack {
             VStack(alignment: .leading) {
                 Text(show.name)
                     .font(.title3)
                     .lineLimit(...1)
-                    .padding(EdgeInsets(top: 56, leading: 15, bottom: 0, trailing: 0))
+                    .padding(EdgeInsets(top: 58, leading: 15, bottom: 0, trailing: 0))
                 Text(nextEpisodeDetails(for: show))
                     .lineLimit(...1)
-                    .padding(EdgeInsets(top: 0, leading: 15, bottom: 14, trailing: 0))
+                    .padding(EdgeInsets(top: 0, leading: 15, bottom: 12, trailing: 0))
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing) {
                 Image(systemName: "clock")
                     .font(.subheadline)
-                    .padding(EdgeInsets(top: 10, leading: 0, bottom: 0, trailing: 15))
+                    .padding(EdgeInsets(top: 16, leading: 0, bottom: 0, trailing: 15))
                 Text(nextEpisodeAvailability)
                     .font(.title)
-                    .padding(EdgeInsets(top: 0, leading: 0, bottom: 20, trailing: 15))
+                    .padding(EdgeInsets(top: 0, leading: 0, bottom: 16, trailing: 15))
                 Text("\(show.nextEpisodeNumber) / \(episodeCount(for: show))")
-                    .padding(EdgeInsets(top: 0, leading: 0, bottom: 14, trailing: 15))
+                    .padding(EdgeInsets(top: 0, leading: 0, bottom: 12, trailing: 15))
             }
-            .frame(maxHeight: .infinity, alignment: .trailing)
         }
         .background(backgroundImage)
         .swipeActions(edge: .leading) {
@@ -114,6 +112,24 @@ struct ShowListItemView: View {
         status: "Returning Series",
         seasonCount: 1
     )
+    let season = Season(
+        show: show,
+        seasonNumber: 1,
+        name: "Season One",
+        overview: "Sample overview text describing the season in more than a single line. Sample overview text describing the season in more than a single line. Sample overview text describing the season in more than a single line. Sample overview text describing the season in more than a single line. Sample overview text describing the season in more than a single line.",
+        poster: Data(),
+        airDate: Date()
+    )
+    show.seasons.append(season)
+    let episode = Episode(
+        season: season,
+        episodeNumber: 1,
+        name: "Episode One",
+        overview: "Sample overview text describing the episode in more than a single line. Sample overview text describing the episode in more than a single line.",
+        airDate: Date(),
+        hostId: 0)
+    season.episodes.append(episode)
+    show.nextEpisode = episode
 
     return ShowListItemView(show: show)
 }

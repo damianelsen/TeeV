@@ -60,7 +60,6 @@ struct ShowsView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
-                UNUserNotificationCenter.current().setBadgeCount(999)  // TODO: remove this
                 Task {
                     await updateBadgeCount()
                     await updateNotificationBadgeCounts()
