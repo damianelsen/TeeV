@@ -25,32 +25,41 @@ struct ShowListItemView: View {
         }
         .frame(width: 400, height: 110)
         .clipped()
+        var backgroundColor: Color = .black
+        if let uiImage = UIImage(data: show.backdrop) {
+            backgroundColor = Color(uiImage.dominantColor()!)
+        }
 
         return HStack {
             VStack(alignment: .leading) {
                 Text(show.name)
                     .font(.title3)
+                    .setContrast(using: backgroundColor)
                     .lineLimit(...1)
                     .padding(EdgeInsets(top: 58, leading: 15, bottom: 0, trailing: 0))
                 Text(nextEpisodeDetails(for: show))
+                    .setContrast(using: backgroundColor)
                     .lineLimit(...1)
                     .padding(EdgeInsets(top: 0, leading: 15, bottom: 12, trailing: 0))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing) {
                 Image(systemName: "clock")
+                    .setContrast(using: backgroundColor)
                     .font(.subheadline)
                     .padding(EdgeInsets(top: 16, leading: 0, bottom: 0, trailing: 15))
                 Text(nextEpisodeAvailability)
                     .font(.title)
+                    .setContrast(using: backgroundColor)
                     .padding(EdgeInsets(top: 0, leading: 0, bottom: 16, trailing: 15))
                 Text("\(show.nextEpisodeNumber) / \(episodeCount(for: show))")
+                    .setContrast(using: backgroundColor)
                     .padding(EdgeInsets(top: 0, leading: 0, bottom: 12, trailing: 15))
             }
         }
         .background(backgroundImage)
         .swipeActions(edge: .leading) {
-            if nextEpisodeAvailability == "Today" {
+            if nextEpisodeAvailability == "Not Started" || nextEpisodeAvailability == "Today" {
                 Button {
                     markEpisodeAsWatched(for: show)
                 } label: {
@@ -62,7 +71,9 @@ struct ShowListItemView: View {
     }
     
     private func nextUnwatchedEpisodeAvailability(for show: Show) -> String {
-        return if show.nextEpisode == nil && show.status == "Returning Series" {
+        return if !show.started {
+            "Not Started"
+        } else if show.nextEpisode == nil && show.status == "Returning Series" {
             "TBA"
         } else if show.nextEpisode == nil {
             show.status
