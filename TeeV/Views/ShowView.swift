@@ -94,8 +94,8 @@ struct ShowView: View {
         episodeNumber: 1,
         name: "Episode One",
         overview: "Sample overview text describing the episode in more than a single line. Sample overview text describing the episode in more than a single line.",
-        airDate: Date(),
-        hostId: 0)
+        airDate: Date()
+    )
     season.episodes.append(episode)
     show.seasons.append(season)
 

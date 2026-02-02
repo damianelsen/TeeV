@@ -100,11 +100,6 @@ struct SeasonEpisodeResponse: Decodable {
     let name: String
     let overview: String?
     let air_date: String?
-    let guest_stars: [SeasonEpisodeGuestStarsResponse]?
-}
-
-struct SeasonEpisodeGuestStarsResponse: Decodable {
-    let id: Int?
 }
 
 func getSeason(forShow showId: Int, with seasonNumber: Int) async throws -> SeasonResponse {

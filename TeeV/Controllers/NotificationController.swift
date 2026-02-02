@@ -12,6 +12,7 @@ import SwiftData
 class NotificationController {
     private var center: UNUserNotificationCenter!
     private let modelContext: ModelContext
+    private var backgroundTaskID: UIBackgroundTaskIdentifier?
 
     init(modelContext: ModelContext) {
         self.center = UNUserNotificationCenter.current()
@@ -27,7 +28,7 @@ class NotificationController {
 
         guard ( settings.authorizationStatus == .authorized ) else { return }
         guard ( self.episodeHasNotAired(for: episode) ) else { return }
-        guard ( self.dailyShowEpisodeNotHostedByJonStewart(episode: episode) ) else { return }
+        guard ( self.dailyShowAirsMonday(for: episode) ) else { return }
 
         let content = UNMutableNotificationContent()
         content.title = "New Episode of \(episode.season.show.name)"
@@ -46,6 +47,11 @@ class NotificationController {
     }
     
     func updateNotificationBadgeCounts() async {
+        self.backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "Finish Updating Notification Badge Counts") {
+            UIApplication.shared.endBackgroundTask(self.backgroundTaskID!)
+            self.backgroundTaskID = UIBackgroundTaskIdentifier.invalid
+        }
+        
         let unwatchedEpisodes = try? modelContext.fetch(FetchDescriptor<Episode>(predicate: #Predicate { episode in
             !episode.watched
         }))
@@ -53,6 +59,7 @@ class NotificationController {
         for notification in await center.pendingNotificationRequests() {
             let notificationTrigger = notification.trigger as! UNCalendarNotificationTrigger
             let episodesNotAired = unwatchedEpisodes!
+                .filter({ self.dailyShowAirsMonday(for: $0) })
                 .map({ self.createTriggerDate(from: $0.airDate) })
                 .map({ Calendar.current.date(from: $0)! })
                 .filter({ $0 <= notificationTrigger.nextTriggerDate()! })
@@ -72,6 +79,9 @@ class NotificationController {
             
             try? await center.add(request)
         }
+        
+        UIApplication.shared.endBackgroundTask(self.backgroundTaskID!)
+        self.backgroundTaskID = UIBackgroundTaskIdentifier.invalid
     }
     
     func setAppBadgeCount(to number: Int) async {
@@ -94,17 +104,20 @@ class NotificationController {
         return max(getDaysBetween(from: getNowAtUtcMidnight(), to: episode.airDate), 0) > 0
     }
     
-    private func dailyShowEpisodeNotHostedByJonStewart(episode: Episode) -> Bool {
-        return !(episode.season.show.id == 2224 && episode.hostId == 0)
+    private func dailyShowAirsMonday(for episode: Episode) -> Bool {
+        guard ( episode.season.show.id == 2224 ) else { return true }
+
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(abbreviation: "UTC")!
+        let airDate = calendar.dateComponents([.weekday], from: episode.airDate)
+
+        return airDate.weekday == 2
     }
     
     private func createTriggerDate(from airDate: Date) -> DateComponents {
         var calendar = Calendar.current
         calendar.timeZone = TimeZone(abbreviation: "UTC")!
-        let notificationDate = calendar.dateComponents(
-            [.year, .month, .day],
-            from: airDate
-        )
+        let notificationDate = calendar.dateComponents([.year, .month, .day], from: airDate)
         
         var triggerDate = DateComponents()
         triggerDate.timeZone = Calendar.current.timeZone

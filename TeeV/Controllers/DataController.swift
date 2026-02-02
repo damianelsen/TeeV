@@ -271,14 +271,12 @@ class DataController {
     }
     
     private func createNewEpisode(for season: Season, from episode: SeasonEpisodeResponse, withInsert insert: Bool = true) -> Episode {
-        let hostId = episode.guest_stars?.first(where: { $0.id == 12219 })?.id ?? 0
         let newEpisode = Episode(
             season: season,
             episodeNumber: episode.episode_number,
             name: episode.name,
             overview: episode.overview ?? String(),
-            airDate: episode.air_date != nil ? convertDate(from: episode.air_date!) : Date.distantPast,
-            hostId: hostId
+            airDate: episode.air_date != nil ? convertDate(from: episode.air_date!) : Date.distantPast
         )
         
         if insert {

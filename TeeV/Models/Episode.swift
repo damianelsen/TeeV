@@ -15,7 +15,6 @@ final class Episode: Equatable {
     var name: String
     var overview: String
     var airDate: Date
-    var hostId: Int?
     var watched: Bool = false
     var notificationId: String?
     
@@ -25,14 +24,12 @@ final class Episode: Equatable {
         name: String,
         overview: String,
         airDate: Date,
-        hostId: Int
     ) {
         self.season = season
         self.episodeNumber = episodeNumber
         self.name = name
         self.overview = overview
         self.airDate = airDate
-        self.hostId = hostId
     }
     
     public static func == (lhs: Episode, rhs: Episode) -> Bool {
