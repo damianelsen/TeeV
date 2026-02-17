@@ -33,12 +33,14 @@ struct ShowListItemView: View {
         return HStack {
             VStack(alignment: .leading) {
                 Text(show.name)
-                    .font(.title3)
                     .setContrast(using: backgroundColor)
+                    .shadow(color: Color.black, radius: 1, x: 0, y: 0)
+                    .font(.title3)
                     .lineLimit(...1)
                     .padding(EdgeInsets(top: 58, leading: 15, bottom: 0, trailing: 0))
                 Text(nextEpisodeDetails(for: show))
                     .setContrast(using: backgroundColor)
+                    .shadow(color: Color.black, radius: 1, x: 0, y: 0)
                     .lineLimit(...1)
                     .padding(EdgeInsets(top: 0, leading: 15, bottom: 12, trailing: 0))
             }
@@ -46,14 +48,17 @@ struct ShowListItemView: View {
             VStack(alignment: .trailing) {
                 Image(systemName: "clock")
                     .setContrast(using: backgroundColor)
+                    .shadow(color: Color.black, radius: 1, x: 0, y: 0)
                     .font(.subheadline)
                     .padding(EdgeInsets(top: 16, leading: 0, bottom: 0, trailing: 15))
                 Text(nextEpisodeAvailability)
-                    .font(.title)
                     .setContrast(using: backgroundColor)
+                    .shadow(color: Color.black, radius: 1, x: 0, y: 0)
+                    .font(.title)
                     .padding(EdgeInsets(top: 0, leading: 0, bottom: 16, trailing: 15))
                 Text("\(show.nextEpisodeNumber) / \(episodeCount(for: show))")
                     .setContrast(using: backgroundColor)
+                    .shadow(color: Color.black, radius: 1, x: 0, y: 0)
                     .padding(EdgeInsets(top: 0, leading: 0, bottom: 12, trailing: 15))
             }
         }

@@ -90,11 +90,9 @@ struct ShowsView: View {
     }
     
     private func updateBadgeCount() async {
-        let showController = DataController(modelContext: modelContext)
         let notificationController = NotificationController(modelContext: modelContext)
         
-        let count = showController.getTotalUnwatchedEpisodes()
-        await notificationController.setAppBadgeCount(to: count)
+        await notificationController.updateAppBadgeCount()
     }
     
     private func updateNotificationBadgeCounts() async {

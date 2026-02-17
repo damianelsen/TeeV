@@ -27,6 +27,7 @@ class NotificationController {
         let settings = await center.notificationSettings()
 
         guard ( settings.authorizationStatus == .authorized ) else { return }
+        guard ( episode.notificationId == nil ) else { return }
         guard ( self.episodeHasNotAired(for: episode) ) else { return }
         guard ( self.dailyShowAirsMonday(for: episode) ) else { return }
 
@@ -55,10 +56,11 @@ class NotificationController {
         let unwatchedEpisodes = try? modelContext.fetch(FetchDescriptor<Episode>(predicate: #Predicate { episode in
             !episode.watched
         }))
-
+        
         for notification in await center.pendingNotificationRequests() {
             let notificationTrigger = notification.trigger as! UNCalendarNotificationTrigger
-            let episodesNotAired = unwatchedEpisodes!
+            let unwatchedEpisodeCount = unwatchedEpisodes!
+                .filter({ $0.airDate != Date.distantPast })
                 .filter({ self.dailyShowAirsMonday(for: $0) })
                 .map({ self.createTriggerDate(from: $0.airDate) })
                 .map({ Calendar.current.date(from: $0)! })
@@ -69,7 +71,7 @@ class NotificationController {
             content.title = notification.content.title
             content.body = notification.content.body
             content.sound = notification.content.sound
-            content.badge = episodesNotAired as NSNumber
+            content.badge = unwatchedEpisodeCount as NSNumber
 
             let request = UNNotificationRequest(
                 identifier: notification.identifier,
@@ -84,11 +86,20 @@ class NotificationController {
         self.backgroundTaskID = UIBackgroundTaskIdentifier.invalid
     }
     
-    func setAppBadgeCount(to number: Int) async {
+    func updateAppBadgeCount() async {
+        let unwatchedEpisodes = try? modelContext.fetch(FetchDescriptor<Episode>(predicate: #Predicate { episode in
+            !episode.watched
+        }))
+        let unwatchedEpisodeCount = unwatchedEpisodes!
+            .filter({ $0.airDate != Date.distantPast })
+            .filter({ max(getDaysBetween(from: getNowAtUtcMidnight(), to: $0.airDate), 0) == 0 })
+            .filter({ self.dailyShowAirsMonday(for: $0) })
+            .count
+
         do {
-            try await self.center.setBadgeCount(number)
+            try await self.center.setBadgeCount(unwatchedEpisodeCount)
         } catch {
-            print("Error setting the badge count to \(number): \(error)")
+            print("Error setting the badge count to \(unwatchedEpisodeCount): \(error)")
         }
     }
     

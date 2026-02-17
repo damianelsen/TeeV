@@ -62,9 +62,7 @@ class DataController {
         let notifications = NotificationController(modelContext: modelContext)
         var updatedMessage = ""
 
-//        try await withThrowingTaskGroup(of: Void.self) { group in
         for show in shows {
-//                group.addTask {
             // Update the show
             let showResponse = try await getShow(with: show.id)
             show.name = showResponse.name
@@ -141,9 +139,6 @@ class DataController {
                 updatedMessage += newSeasonCount > 1 ? "s" : ""
                 updatedMessage += "."
             }
-  //              }
-  //          }
-  //          try await group.waitForAll()
         }
         
         return updatedMessage
@@ -204,20 +199,6 @@ class DataController {
         }
     }
     
-    func getTotalUnwatchedEpisodes() -> Int {
-        let unwatchedEpisodes = try? modelContext.fetch(FetchDescriptor<Episode>(predicate: #Predicate { episode in
-            episode.watched == false
-        }))
-        
-        if let unwatchedEpisodes {
-            return unwatchedEpisodes
-                .filter({ self.daysUntilBroadcast(for: $0) == 0 })
-                .count
-        } else {
-            return 0
-        }
-    }
-
     private func getNextUnwatchedEpisode(for show: Show) -> Episode? {
         let firstSeason = show.seasons.first(where: { $0.seasonNumber == 1 })
 

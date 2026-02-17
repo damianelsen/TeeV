@@ -126,8 +126,11 @@ func getImage(from imagePath: String, asBackdrop: Bool) async throws -> Data {
     request.allHTTPHeaderFields = [
         TeeVConstants.apiHeaderAuthorization: TeeVConstants.apiHeaderToken
     ]
-
-    let (data, _) = try await URLSession.shared.data(for: request)
-
-    return data
+    
+    do {
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return data
+    } catch {
+        return Data.init()
+    }
 }
